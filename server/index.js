@@ -7,6 +7,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 
 if (!GEMINI_API_KEY) {
   console.warn('GEMINI_API_KEY is not set. Set it in the environment.');
@@ -19,7 +20,8 @@ app.post('/api/rewrite', async (req, res) => {
       return res.status(400).json({ error: 'Missing text' });
     }
     const prompt = tone ? `${tone} rewrite: ${text}` : text;
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -31,11 +33,16 @@ app.post('/api/rewrite', async (req, res) => {
         ]
       })
     });
+    let data;
     if (!resp.ok) {
-      const detail = await resp.text();
-      return res.status(resp.status).json({ error: 'Gemini API error', detail });
+      const text = await resp.text();
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { /* ignore */ }
+      const detail = parsed?.error?.message || parsed?.message || text || 'Unknown error';
+      return res.status(resp.status).json({ error: 'Gemini API error', detail, model: GEMINI_MODEL });
+    } else {
+      data = await resp.json();
     }
-    const data = await resp.json();
     const out = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     res.json({ text: out });
   } catch (err) {

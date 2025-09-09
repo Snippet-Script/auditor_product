@@ -43,6 +43,7 @@ export default function CanvasPOC() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiTone, setAiTone] = useState<string>('Concise')
   const [aiOutput, setAiOutput] = useState('')
+  const [aiPos, setAiPos] = useState<{x:number;y:number}>({ x: 0, y: 0 })
 
   const selectEl = (id: string | null) => setSelected(id)
   const getEl = (id: string | null) => els.find(e => e.id === id)
@@ -294,6 +295,25 @@ export default function CanvasPOC() {
     setToolbar({ x: tx, y: ty, visible:true })
   }, [selectedId, els, scale])
 
+  // Position AI panel below the selected text element (like reference UI)
+  useEffect(() => {
+    if (!aiOpen || !selectedId || !artboardRef.current) return
+    const el = getEl(selectedId)
+    if (!el || el.type !== 'text') return
+    const rect = artboardRef.current.getBoundingClientRect()
+    let x = rect.left + el.x * scale
+    let y = rect.top + (el.y + el.h + 10) * scale // 10px gap below element
+    const panelW = 360
+    const margin = 8
+    if (x + panelW + margin > window.innerWidth) x = Math.max(margin, window.innerWidth - panelW - margin)
+    // If too close to bottom, keep it within viewport by nudging up a bit (best effort)
+    const approxPanelH = 220
+    if (y + approxPanelH + margin > window.innerHeight) {
+      y = Math.max(margin, window.innerHeight - approxPanelH - margin)
+    }
+    setAiPos({ x, y })
+  }, [aiOpen, selectedId, els, scale])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!sel || sel.type !== 'text') return
@@ -391,7 +411,7 @@ export default function CanvasPOC() {
               </div>
             )}
             {aiOpen && sel && sel.type==='text' && (
-              <div className={styles.aiPanel} style={{ left: toolbar.x, top: toolbar.y + 40 }}>
+              <div className={styles.aiPanel} style={{ left: aiPos.x, top: aiPos.y }}>
                 <div className={styles.aiHeader}>
                   <strong className={styles.aiTitle}>Rewrite with AI</strong>
                   <button className={styles.aiClose} onClick={()=> setAiOpen(false)}>×</button>
