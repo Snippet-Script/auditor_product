@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import styles from './CanvasPOC.module.css'
+import { rewriteWithAI } from '../../lib/ai'
 
 interface ElementBase { id: string; x: number; y: number; w: number; h: number; type: 'text' | 'rect' | 'image'; rotation?: number }
 interface TextElement extends ElementBase { type: 'text'; text: string; fontSize: number; color: string; fontWeight?: number; fontStyle?: 'normal' | 'italic'; underline?: boolean; fontFamily?: string; textAlign?: 'left' | 'center' | 'right' }
@@ -37,6 +38,11 @@ export default function CanvasPOC() {
   const [guideY, setGuideY] = useState<number | null>(null)
   const [exportingPng, setExportingPng] = useState(false)
   const [toolbar, setToolbar] = useState<{x:number;y:number;visible:boolean}>({x:0,y:0,visible:false})
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiTone, setAiTone] = useState<string>('Concise')
+  const [aiOutput, setAiOutput] = useState('')
 
   const selectEl = (id: string | null) => setSelected(id)
   const getEl = (id: string | null) => els.find(e => e.id === id)
@@ -61,7 +67,13 @@ export default function CanvasPOC() {
   const onPointerDown = (e: React.PointerEvent, id: string) => {
     e.stopPropagation()
     selectEl(id)
-    const el = getEl(id); if (!el || !artboardRef.current) return
+  const clicked = getEl(id)
+  if (clicked && clicked.type === 'text') {
+      setAiOpen(true)
+    } else {
+      setAiOpen(false)
+    }
+  const el = clicked; if (!el || !artboardRef.current) return
     const rect = artboardRef.current.getBoundingClientRect()
     const ex = el.x; const ey = el.y
     const ox = (e.clientX - rect.left) / scale - ex
@@ -274,7 +286,7 @@ export default function CanvasPOC() {
   useEffect(() => {
     if (!selectedId || !artboardRef.current) { setToolbar(t=>({...t, visible:false})); return }
     const el = getEl(selectedId)
-    if (!el || el.type !== 'text') { setToolbar(t=>({...t, visible:false})); return }
+  if (!el || el.type !== 'text') { setToolbar(t=>({...t, visible:false})); setAiOpen(false); return }
     const rect = artboardRef.current.getBoundingClientRect()
     const tx = rect.left + el.x * scale
     let ty = rect.top + (el.y - 48) * scale
@@ -373,8 +385,33 @@ export default function CanvasPOC() {
                       <option value="'Times New Roman', serif">Times New Roman</option>
                       <option value="Arial, sans-serif">Arial</option>
                     </select>
+                    <button className={styles.styleBtn} onClick={() => setAiOpen(v => !v)}>AI ✨</button>
                   </>
                 )})()}
+              </div>
+            )}
+            {aiOpen && sel && sel.type==='text' && (
+              <div style={{ position:'fixed', left: toolbar.x, top: toolbar.y + 36, zIndex: 1000, background:'#fff', border:'1px solid #e1e4e8', boxShadow:'0 6px 24px rgba(0,0,0,0.08)', padding:12, borderRadius:8, width: 340 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <strong style={{ fontSize: 12, letterSpacing: '.04em' }}>Rewrite with AI</strong>
+                  <button onClick={()=> setAiOpen(false)} style={{ border:'none', background:'transparent', cursor:'pointer' }}>×</button>
+                </div>
+                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                  <select value={aiTone} onChange={(e)=> setAiTone(e.target.value)}>
+                    <option>Concise</option>
+                    <option>Friendly</option>
+                    <option>Professional</option>
+                    <option>Expand</option>
+                  </select>
+                  <button disabled={aiLoading} onClick={async ()=>{ if (!sel || sel.type!=='text') return; setAiLoading(true); setAiError(null); setAiOutput(''); try { const out = await rewriteWithAI((sel as TextElement).text, aiTone); setAiOutput(out); } catch (err:any) { setAiError(err.message||'Failed'); } finally { setAiLoading(false); } }}> {aiLoading ? 'Rewriting…' : 'Rewrite'} </button>
+                </div>
+                {aiError && <div style={{ color:'crimson', fontSize:12, marginBottom:8 }}>{aiError}</div>}
+                <div style={{ background:'#fafbfc', padding:8, borderRadius:6, minHeight:48, whiteSpace:'pre-wrap' }}>{aiOutput || '—'}</div>
+                <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                  <button disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, aiOutput); setAiOpen(false) }}>Replace</button>
+                  <button disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, ((sel as TextElement).text + '\n' + aiOutput)); setAiOpen(false) }}>Add below</button>
+                  <button disabled={!aiOutput} onClick={async ()=>{ if (!aiOutput) return; await navigator.clipboard.writeText(aiOutput) }}>Copy</button>
+                </div>
               </div>
             )}
             <div className={styles.zoomBadge}>
