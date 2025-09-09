@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     // Keep local dev flexible; allowedHosts only affects external access
-  allowedHosts: ['auditor-product.onrender.com', 'auditor-product-1.onrender.com'],
+  allowedHosts: ['auditor-product-1.onrender.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
