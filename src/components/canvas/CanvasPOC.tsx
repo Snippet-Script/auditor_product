@@ -391,26 +391,26 @@ export default function CanvasPOC() {
               </div>
             )}
             {aiOpen && sel && sel.type==='text' && (
-              <div style={{ position:'fixed', left: toolbar.x, top: toolbar.y + 36, zIndex: 1000, background:'#fff', border:'1px solid #e1e4e8', boxShadow:'0 6px 24px rgba(0,0,0,0.08)', padding:12, borderRadius:8, width: 340 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <strong style={{ fontSize: 12, letterSpacing: '.04em' }}>Rewrite with AI</strong>
-                  <button onClick={()=> setAiOpen(false)} style={{ border:'none', background:'transparent', cursor:'pointer' }}>×</button>
+              <div className={styles.aiPanel} style={{ left: toolbar.x, top: toolbar.y + 40 }}>
+                <div className={styles.aiHeader}>
+                  <strong className={styles.aiTitle}>Rewrite with AI</strong>
+                  <button className={styles.aiClose} onClick={()=> setAiOpen(false)}>×</button>
                 </div>
-                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                  <select value={aiTone} onChange={(e)=> setAiTone(e.target.value)}>
+                <div className={styles.aiControls}>
+                  <select className={styles.aiSelect} value={aiTone} onChange={(e)=> setAiTone(e.target.value)}>
                     <option>Concise</option>
                     <option>Friendly</option>
                     <option>Professional</option>
                     <option>Expand</option>
                   </select>
-                  <button disabled={aiLoading} onClick={async ()=>{ if (!sel || sel.type!=='text') return; setAiLoading(true); setAiError(null); setAiOutput(''); try { const out = await rewriteWithAI((sel as TextElement).text, aiTone); setAiOutput(out); } catch (err:any) { setAiError(err.message||'Failed'); } finally { setAiLoading(false); } }}> {aiLoading ? 'Rewriting…' : 'Rewrite'} </button>
+                  <button className={styles.aiRewriteBtn} disabled={aiLoading} onClick={async ()=>{ if (!sel || sel.type!=='text') return; setAiLoading(true); setAiError(null); setAiOutput(''); try { const out = await rewriteWithAI((sel as TextElement).text, aiTone); setAiOutput(out); } catch (err:any) { setAiError(err.message||'Failed'); } finally { setAiLoading(false); } }}>{aiLoading ? 'Rewriting…' : 'Rewrite'}</button>
                 </div>
-                {aiError && <div style={{ color:'crimson', fontSize:12, marginBottom:8 }}>{aiError}</div>}
-                <div style={{ background:'#fafbfc', padding:8, borderRadius:6, minHeight:48, whiteSpace:'pre-wrap' }}>{aiOutput || '—'}</div>
-                <div style={{ display:'flex', gap:8, marginTop:8 }}>
-                  <button disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, aiOutput); setAiOpen(false) }}>Replace</button>
-                  <button disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, ((sel as TextElement).text + '\n' + aiOutput)); setAiOpen(false) }}>Add below</button>
-                  <button disabled={!aiOutput} onClick={async ()=>{ if (!aiOutput) return; await navigator.clipboard.writeText(aiOutput) }}>Copy</button>
+                {aiError && <div className={styles.aiError}>{aiError}</div>}
+                <div className={styles.aiOutput}>{aiOutput || '—'}</div>
+                <div className={styles.aiActions}>
+                  <button className={`${styles.aiBtn} ${styles.aiBtnPrimary}`} disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, aiOutput); setAiOpen(false) }}>Replace</button>
+                  <button className={styles.aiBtn} disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, ((sel as TextElement).text + '\n' + aiOutput)); setAiOpen(false) }}>Add below</button>
+                  <button className={styles.aiBtn} disabled={!aiOutput} onClick={async ()=>{ if (!aiOutput) return; await navigator.clipboard.writeText(aiOutput) }}>Copy</button>
                 </div>
               </div>
             )}

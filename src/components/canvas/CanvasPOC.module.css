@@ -86,3 +86,21 @@
 .inlineToolbar button.active { background:#22364a; border-color:var(--accent); color:#fff; }
 .inlineToolbar select { background:#1c2226; border:1px solid #30363c; color:#d5dae0; font-size:11px; border-radius:4px; padding:4px 6px; }
 .alignGroup { display:flex; gap:4px; }
+
+/* AI Rewrite panel */
+.aiPanel { position:fixed; z-index:7500; background:#14191d; color:#d5dae0; border:1px solid #2d3236; box-shadow:0 12px 32px -8px rgba(0,0,0,.55); padding:12px; border-radius:10px; width:360px; backdrop-filter:blur(6px); }
+.aiHeader { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.aiTitle { font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#9aa2a9; font-weight:700; }
+.aiClose { border:none; background:transparent; color:#9aa2a9; cursor:pointer; font-size:16px; line-height:1; padding:2px 6px; border-radius:6px; }
+.aiClose:hover { background:#20262b; color:#fff; }
+.aiControls { display:flex; gap:8px; margin-bottom:8px; }
+.aiSelect { background:#1c2226; border:1px solid #30363c; color:#d5dae0; font-size:12px; border-radius:6px; padding:6px 8px; }
+.aiRewriteBtn { background:#2684ff; border:1px solid #2684ff; color:#fff; font-weight:700; font-size:12px; padding:6px 10px; border-radius:8px; cursor:pointer; min-width:90px; }
+.aiRewriteBtn:hover { background:#2f8bfd; border-color:#2f8bfd; }
+.aiError { color:#ff6b6b; font-size:12px; margin-bottom:8px; }
+.aiOutput { background:#0f1418; border:1px solid #2b3238; color:#e6ebef; padding:10px; border-radius:8px; min-height:64px; white-space:pre-wrap; max-height:260px; overflow:auto; }
+.aiActions { display:flex; gap:8px; margin-top:10px; }
+.aiBtn { background:#232a30; border:1px solid #30383e; color:#d5dae0; font-size:12px; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:600; }
+.aiBtn:hover { background:#2e363c; }
+.aiBtnPrimary { background:#2684ff; border-color:#2684ff; color:#fff; }
+.aiBtnPrimary:hover { background:#2f8bfd; }
