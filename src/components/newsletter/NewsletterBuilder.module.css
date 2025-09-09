@@ -1,0 +1,81 @@
+/* Moved from root: NewsletterBuilder.module.css */
+/* Layout */
+.outerRoot { display:flex; flex-direction:column; height:100vh; background:#111; color:#eee; font-family: system-ui,sans-serif; }
+.topBar { height:44px; background:#0d0d0d; display:flex; align-items:center; padding:0 14px; gap:20px; border-bottom:1px solid #202020; }
+.brand { font-weight:600; font-size:15px; cursor:pointer; }
+.topTabs { display:flex; gap:4px; }
+.topTab { background:transparent; border:0; color:#888; font-size:12px; padding:6px 10px; cursor:pointer; border-radius:4px; }
+.topTabActive { background:#181818; color:#fff; box-shadow:0 0 0 1px #1db954 inset; }
+.creditPill { margin-left:auto; background:#181818; padding:4px 10px; border-radius:99px; font-size:12px; color:#b6f3c8; border:1px solid #0b4d24; }
+.creditPill span { color:#89c7a2; }
+.container { flex:1; display:flex; overflow:hidden; }
+.sideBar { width: 320px; background:#000; border-right:1px solid #222; display:flex; flex-direction:column; }
+.tabsPlaceholder { height:0; }
+.tabs { display:flex; border-bottom:1px solid #222; }
+.tabButton { flex:1; background:#000; color:#aaa; padding:10px 14px; font-size:14px; border:0; cursor:pointer; }
+.tabButtonActive { color:#fff; background:#111; border-bottom:2px solid #1db954; }
+.panelScroll { flex:1; overflow:auto; padding:14px 14px 40px; display:flex; flex-direction:column; gap:14px; }
+.fieldGroup { display:flex; gap:8px; }
+.input, .textarea, .smallInput { background:#111; border:1px solid #333; border-radius:2px; color:#eee; font-size:12px; padding:6px 8px; width:100%; }
+.smallInput { flex:1; }
+.textarea { min-height:70px; resize:vertical; }
+.sectionLabel { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#999; }
+.radioRow { display:flex; gap:16px; font-size:12px; }
+.radioRow label { display:flex; align-items:center; gap:4px; cursor:pointer; }
+.sourcesBox { min-height:60px; }
+.canvasColumn { flex:1; display:flex; flex-direction:column; overflow:auto; padding:20px 28px 60px; gap:28px; background:#161616; }
+.canvasPanel { background:#1c1c1c; border:1px solid #222; min-height:260px; border-radius:4px; padding:14px 18px 22px; color:#ddd; font-size:12px; position:relative; display:flex; flex-direction:column; gap:14px; }
+.blockPanel { min-height:auto; padding:10px 14px 14px; gap:10px; }
+.previewPanelWrapper { flex:1; min-height:0; display:flex; flex-direction:column; }
+.previewPanelWrapper .previewPanel { flex:1; min-height:0; }
+.blockList { display:flex; flex-direction:column; gap:8px; }
+.blockItem { background:#222; border:1px solid #333; border-radius:4px; padding:10px 12px; display:flex; gap:10px; align-items:center; cursor:grab; }
+.blockItem.dragging { opacity:.35; }
+.blockItemDragOver { outline:2px dashed #1db954; }
+.dragHandle { font-size:14px; line-height:1; cursor:grab; color:#888; }
+.blockContent { flex:1; }
+.blockToolbar { display:flex; gap:6px; }
+.blockToolbar button { background:#333; border:1px solid #444; color:#ddd; font-size:11px; padding:4px 8px; cursor:pointer; }
+.blockToolbar button:hover { background:#444; }
+.addBlockBar { display:flex; flex-wrap:wrap; gap:8px; }
+.addBlockBar button { background:#06240f; border:1px solid #0b4d24; color:#b6f3c8; font-size:11px; padding:6px 10px; border-radius:4px; cursor:pointer; }
+.addBlockBar button:hover { background:#0b4d24; }
+.rteWrapper { border:1px solid #333; background:#111; border-radius:4px; }
+.rteToolbar { display:flex; gap:6px; padding:4px 6px; border-bottom:1px solid #222; background:#181818; }
+.rteToolbar button { background:#222; border:1px solid #333; color:#ccc; font-size:11px; padding:4px 6px; cursor:pointer; }
+.rteToolbar button.active { background:#2f2f2f; color:#fff; }
+.rteToolbar button:hover { background:#2a2a2a; }
+.rteEditable { min-height:70px; padding:8px 10px; outline:none; font-size:12px; line-height:1.4; }
+.rteEditable:empty:before { content:attr(data-placeholder); color:#555; }
+.assetSection { display:flex; flex-direction:column; gap:10px; }
+.assetList { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:8px; }
+.assetThumb { position:relative; aspect-ratio:1/1; border:1px solid #333; border-radius:4px; overflow:hidden; cursor:pointer; background:#111; }
+.assetThumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.assetThumb.selected { outline:2px solid #1db954; }
+.uploadInput { font-size:11px; }
+.themeGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.themeRow { display:flex; flex-direction:column; gap:4px; font-size:11px; }
+.previewOuter { background:#d9d9d9; color:#111; padding:20px 26px; border-radius:6px; line-height:1.4; font-size:14px; box-shadow:0 0 0 1px #ccc inset; }
+.previewOuter h1, .previewOuter h2, .previewOuter h3 { margin:0 0 12px; line-height:1.15; }
+.previewOuter p { margin:0 0 10px; }
+.row { display:flex; gap:8px; align-items:center; }
+.spacer { flex:1; }
+.designModeWrapper { flex:1; display:flex; }
+.previewPane { flex:1; padding:28px; }
+.previewPanel { background:#1d1d1d; height:100%; padding:0; color:#ddd; font-size:12px; overflow:auto; }
+.autoDesignBtn { background:#06240f; color:#b6f3c8; border:1px solid #0b4d24; font-size:12px; padding:6px 12px; border-radius:4px; cursor:pointer; }
+.autoDesignBtn:hover { background:#0b4d24; }
+.toolbar { position:absolute; top:8px; right:8px; display:flex; gap:6px; }
+.toolbar button { background:#222; border:1px solid #333; color:#ddd; font-size:11px; padding:4px 8px; cursor:pointer; }
+.toolbar button:hover { background:#2f2f2f; }
+.pageTabs { display:flex; gap:6px; flex-wrap:wrap; }
+.pageTab { display:flex; background:#181818; border:1px solid #2a2a2a; border-radius:4px; overflow:hidden; }
+.pageTabActive { border-color:#1db954; box-shadow:0 0 0 1px #1db954 inset; }
+.pageTab > button { background:transparent; border:0; color:#bbb; font-size:11px; padding:4px 8px; cursor:pointer; }
+.pageTabActive > button { color:#fff; }
+.pageTabMenu { display:flex; }
+.pageTabMenu button { background:#222; border:0; color:#777; font-size:11px; padding:4px 6px; cursor:pointer; }
+.pageTabMenu button:hover { color:#fff; background:#2f2f2f; }
+.addPageBtn { background:#06240f; border:1px solid #0b4d24; color:#b6f3c8; font-size:11px; padding:4px 10px; border-radius:4px; cursor:pointer; }
+.addPageBtn:hover { background:#0b4d24; }
+@media (max-width:1100px){ .container { flex-direction:column; } .sideBar { width:100%; flex-direction:column; } .canvasColumn { padding:16px; } }
