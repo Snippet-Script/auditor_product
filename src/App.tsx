@@ -14,6 +14,7 @@ import Schedule from './routes/Schedule'
 import AnalyticsPage from './routes/AnalyticsPage'
 import { NewsletterBuilder } from './components/newsletter'
 import { CanvasPOC } from './components/canvas'
+import { RewriteBox } from './components/ai/RewriteBox'
 
 const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
 
@@ -70,6 +71,7 @@ function AppRoutes() {
       {/* Existing editors */}
       <Route path="/builder" element={idToken ? <CanvasPOC /> : <Navigate to="/" replace />} />
       <Route path="/builder-advanced" element={idToken ? <NewsletterBuilder /> : <Navigate to="/" replace />} />
+  <Route path="/rewrite" element={idToken ? <RewriteBox /> : <Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to={idToken ? '/home' : '/'} replace />} />
     </Routes>
   )
