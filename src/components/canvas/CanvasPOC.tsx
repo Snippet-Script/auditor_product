@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import styles from './CanvasPOC.module.css'
 import { rewriteWithAI } from '../../lib/ai'
 
@@ -20,6 +21,7 @@ const PAGES_KEY = 'canvas-poc-pages'
 const ASSETS_KEY = 'canvas-poc-assets'
 
 export default function CanvasPOC() {
+  const navigate = useNavigate()
   const [pages, setPages] = useState<Page[]>(() => {
     try { const raw = localStorage.getItem(PAGES_KEY); if (raw) return JSON.parse(raw) as Page[] } catch {}
     return [{ id: crypto.randomUUID(), name: 'Page 1', elements: [createText()] }]
@@ -359,6 +361,7 @@ export default function CanvasPOC() {
           </div>
         </div>
         <div className={styles.actionBar}>
+          <button onClick={()=> navigate('/preview')}>Preview</button>
           <button onClick={exportJSON}>Export JSON</button>
             <button disabled={exportingPng} onClick={exportPNG}>{exportingPng? 'PNG...' : 'Export PNG'}</button>
           <button onClick={()=>updateCurrent(()=>[])}>Clear</button>

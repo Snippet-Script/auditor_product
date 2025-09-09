@@ -61,6 +61,7 @@ Canvas POC:
 - Local asset uploads and image insertion
 - Export current page to PNG (manual canvas render) & JSON of elements
 - Multi-page support with rename/add/delete
+ - Preview button jumps to the Preview route; from there, proceed to Contacts
 
 ## Persistence
 
@@ -82,4 +83,11 @@ LocalStorage keys:
 ## Notes
 
 Legacy root component files were removed; CSS modules now colocated with each component for cohesion.
+
+## Wireframe flow
+
+- Home → "Open Wireframe Flow" guides through Template → Source → Content → Design → Preview → Contacts → Schedule → Analytics.
+- From Template, you can open the Canvas editor directly.
+- In Canvas, clicking a text element opens the toolbar and AI rewrite panel.
+- Use the "Preview" button in Canvas to navigate to the Preview page; from Preview, click "Next: Contacts" to continue the flow.
 
