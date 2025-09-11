@@ -585,6 +585,15 @@ export default function CanvasPOC() {
             </div>
           </div>
         </div>
+        {/* Bottom zoom bar */}
+        <div className={styles.bottomZoomBar}>
+          <button onClick={zoomOut}>-</button>
+          <span className="zoomPct">{Math.round(scale * 100)}%</span>
+          <input type="range" min={25} max={300} value={Math.round(scale * 100)} onChange={(e) => setScale(Math.max(0.25, Math.min(3, parseInt(e.target.value, 10) / 100)))} />
+          <button onClick={zoomIn}>+</button>
+          <button onClick={resetZoom}>Reset</button>
+          <button disabled={exportingPdf} onClick={exportPDF}>{exportingPdf ? 'PDF…' : 'Export PDF'}</button>
+        </div>
       </div>
       <aside className={styles.rightPanel}>
         <div className={styles.section}>
