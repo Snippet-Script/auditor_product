@@ -165,7 +165,11 @@ export default function CanvasPOC() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected() }
+      // Don't delete selected element if currently editing text
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (editingId) return
+        deleteSelected()
+      }
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'd') {
           const el = getEl(selectedId); if (!el) return
@@ -176,7 +180,7 @@ export default function CanvasPOC() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, deleteSelected])
+  }, [selectedId, deleteSelected, editingId])
 
   const exportJSON = () => {
     setExporting(true)
@@ -551,8 +555,8 @@ export default function CanvasPOC() {
                         style={{ fontSize:t.fontSize, fontWeight:t.fontWeight, color:t.color, fontStyle:t.fontStyle, textDecoration:t.underline? 'underline':'none', fontFamily:t.fontFamily, textAlign:t.textAlign }}
                         onFocus={() => setEditingId(t.id)}
                         onBlur={e => handleTextBlur(t.id, e)}
-                        onInput={e => handleTextInput(t.id, e)}
-                      >{editingId === t.id ? undefined : t.text}</div>
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >{t.text}</div>
                       {el.id === selectedId && <div className={`${styles.resizeHandle} ${styles['rh-br']}`} onPointerDown={e => onResizeDown(e, el.id, 'br')} />}
                     </div>
                   )
