@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { jsPDF } from 'jspdf'
 import { useNavigate } from 'react-router-dom'
 import styles from './CanvasPOC.module.css'
 import { rewriteWithAI } from '../../lib/ai'
@@ -39,6 +40,7 @@ export default function CanvasPOC() {
   const [guideX, setGuideX] = useState<number | null>(null)
   const [guideY, setGuideY] = useState<number | null>(null)
   const [exportingPng, setExportingPng] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [toolbar, setToolbar] = useState<{x:number;y:number;visible:boolean}>({x:0,y:0,visible:false})
   const [aiOpen, setAiOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -46,6 +48,7 @@ export default function CanvasPOC() {
   const [aiTone, setAiTone] = useState<string>('Concise')
   const [aiOutput, setAiOutput] = useState('')
   const [aiPos, setAiPos] = useState<{x:number;y:number}>({ x: 0, y: 0 })
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const selectEl = (id: string | null) => setSelected(id)
   const getEl = (id: string | null) => els.find(e => e.id === id)
@@ -240,6 +243,73 @@ export default function CanvasPOC() {
     setTimeout(()=> setExportingPng(false), 400)
   }
 
+  const exportPDF = async () => {
+    if (exportingPdf) return
+    setExportingPdf(true)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 794; canvas.height = 1123
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height)
+      const loadImage = (src:string) => new Promise<HTMLImageElement>((res,rej)=>{ const im = new Image(); im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=rej; im.src=src })
+      for (const el of els) {
+        if (el.type === 'rect') {
+          const r = el as RectElement
+          ctx.fillStyle = r.fill
+          const radius = r.radius
+          ctx.beginPath()
+          const x = r.x; const y = r.y; const w = r.w; const h = r.h
+          const rr = Math.min(radius, w/2, h/2)
+          ctx.moveTo(x+rr,y)
+          ctx.lineTo(x+w-rr,y)
+          ctx.quadraticCurveTo(x+w,y,x+w,y+rr)
+          ctx.lineTo(x+w,y+h-rr)
+          ctx.quadraticCurveTo(x+w,y+h,x+w-rr,y+h)
+          ctx.lineTo(x+rr,y+h)
+          ctx.quadraticCurveTo(x,y+h,x,y+h-rr)
+          ctx.lineTo(x,y+rr)
+          ctx.quadraticCurveTo(x,y,x+rr,y)
+          ctx.closePath(); ctx.fill()
+        } else if (el.type === 'text') {
+          const t = el as TextElement
+          ctx.fillStyle = t.color
+          ctx.font = `${t.fontStyle === 'italic' ? 'italic ' : ''}${t.fontWeight || 400} ${t.fontSize}px ${t.fontFamily || 'system-ui, sans-serif'}`
+          ctx.textBaseline = 'top'
+          ctx.textAlign = t.textAlign || 'left'
+          const lines = t.text.split(/\n/)
+          let cy = t.y
+          const baseX = t.textAlign === 'center' ? t.x + t.w/2 : t.textAlign === 'right' ? t.x + t.w : t.x
+          for (const line of lines) {
+            ctx.fillText(line, baseX, cy)
+            if (t.underline) { const m = ctx.measureText(line); const underlineY = cy + t.fontSize + Math.max(1, t.fontSize * 0.05); ctx.beginPath(); ctx.strokeStyle = t.color; ctx.lineWidth = Math.max(1, t.fontSize/16); const startX = baseX - (t.textAlign==='center'? m.width/2 : t.textAlign==='right'? m.width:0); ctx.moveTo(startX, underlineY); ctx.lineTo(startX + m.width, underlineY); ctx.stroke(); }
+            cy += t.fontSize * 1.3
+          }
+        } else if (el.type === 'image') {
+          const im = el as ImageElement
+          try { const image = await loadImage(im.src); ctx.save(); if (im.fit === 'cover') {
+            const scale = Math.max(im.w / image.width, im.h / image.height)
+            const dw = image.width * scale; const dh = image.height * scale
+            const dx = im.x + (im.w - dw)/2; const dy = im.y + (im.h - dh)/2
+            ctx.drawImage(image, dx, dy, dw, dh)
+          } else {
+            const scale = Math.min(im.w / image.width, im.h / image.height)
+            const dw = image.width * scale; const dh = image.height * scale
+            const dx = im.x + (im.w - dw)/2; const dy = im.y + (im.h - dh)/2
+            ctx.drawImage(image, dx, dy, dw, dh)
+          } ctx.restore() } catch {}
+        }
+      }
+      const url = canvas.toDataURL('image/png')
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+      doc.addImage(url, 'PNG', 0, 0, pageW, pageH)
+      doc.save(`${pages.find(p=>p.id===currentPage)?.name || 'page'}.pdf`)
+    } finally {
+      setTimeout(()=> setExportingPdf(false), 400)
+    }
+  }
+
   const json = JSON.stringify(els, null, 2)
   const zoomIn = () => setScale(s => Math.min(3, +(s + 0.1).toFixed(2)))
   const zoomOut = () => setScale(s => Math.max(0.25, +(s - 0.1).toFixed(2)))
@@ -248,12 +318,33 @@ export default function CanvasPOC() {
     const txt = (e.target as HTMLDivElement).innerText.replace(/\n+/g, '\n')
     onTextEdit(id, txt)
   }
+  const handleTextBlur = (id: string, e: React.FocusEvent<HTMLDivElement>) => {
+    const txt = e.currentTarget.innerText.replace(/\n+/g, '\n')
+    onTextEdit(id, txt)
+    setEditingId(null)
+  }
+  const onArtboardWheel = (e: React.WheelEvent) => {
+    // Zoom the A4 artboard under the cursor; prevent page scroll
+    e.preventDefault()
+    if (e.deltaY > 0) zoomOut(); else zoomIn()
+  }
   const sel = getEl(selectedId)
   const updateSel = (patch: Partial<any>) => { if (!selectedId) return; updateCurrent(list => list.map(e => e.id === selectedId ? { ...e, ...patch } : e)) }
   const bringForward = () => { if (!selectedId) return; updateCurrent(list => { const idx = list.findIndex(e => e.id === selectedId); if (idx === -1 || idx === list.length - 1) return list; const copy=[...list]; const [el]=copy.splice(idx,1); copy.splice(idx+1,0,el); return copy }) }
   const sendBackward = () => { if (!selectedId) return; updateCurrent(list => { const idx = list.findIndex(e => e.id === selectedId); if (idx <= 0) return list; const copy=[...list]; const [el]=copy.splice(idx,1); copy.splice(idx-1,0,el); return copy }) }
   const duplicateSel = () => { if (!sel) return; const clone: AnyEl = { ...sel, id: crypto.randomUUID(), x: sel.x + 30, y: sel.y + 30 }; updateCurrent(l => [...l, clone]); setSelected(clone.id) }
-  const addPage = () => { const pg: Page = { id: crypto.randomUUID(), name: `Page ${pages.length + 1}`, elements: [] }; setPages(p => [...p, pg]); setCurrentPage(pg.id); setSelected(null) }
+  const addPage = () => {
+    const pg: Page = { id: crypto.randomUUID(), name: `Page ${pages.length + 1}`, elements: [] }
+    setPages(p => {
+      const idx = p.findIndex(x => x.id === currentPage)
+      if (idx === -1) return [...p, pg]
+      const copy = [...p]
+      copy.splice(idx + 1, 0, pg)
+      return copy
+    })
+    setCurrentPage(pg.id)
+    setSelected(null)
+  }
   const applyNewsletterTemplate = () => {
     const hero = createRect(); hero.x = 60; hero.y = 140; hero.w = 674; hero.h = 260; hero.fill = '#ececec'
     const title = createText(); title.text = 'Newsletter Title'; title.x = 60; title.y = 40; title.fontSize = 54; title.w = 650
@@ -364,6 +455,7 @@ export default function CanvasPOC() {
           <button onClick={()=> navigate('/preview')}>Preview</button>
           <button onClick={exportJSON}>Export JSON</button>
             <button disabled={exportingPng} onClick={exportPNG}>{exportingPng? 'PNG...' : 'Export PNG'}</button>
+          <button disabled={exportingPdf} onClick={exportPDF}>{exportingPdf ? 'PDF...' : 'Export PDF'}</button>
           <button onClick={()=>updateCurrent(()=>[])}>Clear</button>
         </div>
         <div className={styles.pageBar}>
@@ -443,7 +535,7 @@ export default function CanvasPOC() {
               <button onClick={zoomIn}>+</button>
               <button onClick={resetZoom}>reset</button>
             </div>
-            <div ref={artboardRef} className={styles.artboard} style={{ transform:`scale(${scale})` }} onPointerDown={() => selectEl(null)}>
+            <div ref={artboardRef} className={styles.artboard} style={{ transform:`scale(${scale})` }} onPointerDown={() => selectEl(null)} onWheel={(e) => { if (e.ctrlKey) onArtboardWheel(e) }}>
               {guideX !== null && <div className={`${styles.guide} ${styles.v}`} style={{ left:guideX }} />}
               {guideY !== null && <div className={`${styles.guide} ${styles.h}`} style={{ top:guideY }} />}
               {els.length === 0 && <div className={styles.emptyHint}>Add elements from left</div>}
@@ -457,8 +549,10 @@ export default function CanvasPOC() {
                         contentEditable
                         suppressContentEditableWarning
                         style={{ fontSize:t.fontSize, fontWeight:t.fontWeight, color:t.color, fontStyle:t.fontStyle, textDecoration:t.underline? 'underline':'none', fontFamily:t.fontFamily, textAlign:t.textAlign }}
+                        onFocus={() => setEditingId(t.id)}
+                        onBlur={e => handleTextBlur(t.id, e)}
                         onInput={e => handleTextInput(t.id, e)}
-                      >{t.text}</div>
+                      >{editingId === t.id ? undefined : t.text}</div>
                       {el.id === selectedId && <div className={`${styles.resizeHandle} ${styles['rh-br']}`} onPointerDown={e => onResizeDown(e, el.id, 'br')} />}
                     </div>
                   )
