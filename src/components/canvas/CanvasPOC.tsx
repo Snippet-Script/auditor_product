@@ -49,6 +49,7 @@ export default function CanvasPOC() {
   const [aiOutput, setAiOutput] = useState('')
   const [aiPos, setAiPos] = useState<{x:number;y:number}>({ x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
+  const editorRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const selectEl = (id: string | null) => setSelected(id)
   const getEl = (id: string | null) => els.find(e => e.id === id)
@@ -75,7 +76,7 @@ export default function CanvasPOC() {
     selectEl(id)
   const clicked = getEl(id)
   if (clicked && clicked.type === 'text') {
-      setAiOpen(true)
+  setAiOpen(true)
     } else {
       setAiOpen(false)
     }
@@ -547,15 +548,22 @@ export default function CanvasPOC() {
                 if (el.type === 'text') {
                   const t = el as TextElement
                   return (
-                    <div key={el.id} className={`${styles.el} ${el.id === selectedId ? styles.selected : ''} ${styles.textBox}`} style={{ left:t.x, top:t.y, width:t.w, height:t.h }} onPointerDown={e => onPointerDown(e, el.id)}>
+                    <div
+                      key={el.id}
+                      className={`${styles.el} ${el.id === selectedId ? styles.selected : ''} ${styles.textBox}`}
+                      style={{ left:t.x, top:t.y, width:t.w, height:t.h }}
+                      onPointerDown={e => onPointerDown(e, el.id)}
+                      onDoubleClick={() => { const ref = editorRefs.current.get(t.id); if (ref) { ref.focus(); setEditingId(t.id) } }}
+                    >
                       <div
                         className={styles.inlineEdit}
                         contentEditable
                         suppressContentEditableWarning
                         style={{ fontSize:t.fontSize, fontWeight:t.fontWeight, color:t.color, fontStyle:t.fontStyle, textDecoration:t.underline? 'underline':'none', fontFamily:t.fontFamily, textAlign:t.textAlign }}
+                        ref={(node) => { if (node) editorRefs.current.set(t.id, node); else editorRefs.current.delete(t.id) }}
                         onFocus={() => setEditingId(t.id)}
                         onBlur={e => handleTextBlur(t.id, e)}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => { e.stopPropagation(); selectEl(t.id); setEditingId(t.id); setAiOpen(true); }}
                       >{t.text}</div>
                       {el.id === selectedId && <div className={`${styles.resizeHandle} ${styles['rh-br']}`} onPointerDown={e => onResizeDown(e, el.id, 'br')} />}
                     </div>
