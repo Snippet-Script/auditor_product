@@ -1,5 +1,5 @@
 import React from 'react'
-import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google'
+// Google OAuth now handled through Firebase Auth popup
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/auth'
 import Home from './routes/Home'
@@ -12,6 +12,8 @@ import Preview from './routes/Preview'
 import Contacts from './routes/Contacts'
 import Schedule from './routes/Schedule'
 import AnalyticsPage from './routes/AnalyticsPage'
+import AdminUsage from './routes/AdminUsage'
+import AdminStates from './routes/AdminStates'
 import { NewsletterBuilder } from './components/newsletter'
 import { CanvasPOC } from './components/canvas'
 import { RewriteBox } from './components/ai/RewriteBox'
@@ -19,37 +21,28 @@ import { RewriteBox } from './components/ai/RewriteBox'
 const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
 
 function Login() {
-  const { login } = useAuth()
+  const { signInWithGoogle, loading } = useAuth()
   const navigate = useNavigate()
-  const onSuccess = (cred: CredentialResponse) => {
-    if (cred.credential) {
-      login(cred.credential)
+  const onClick = async () => {
+    try {
+      await signInWithGoogle()
       navigate('/home', { replace: true })
+    } catch (e) {
+      alert('Login failed')
     }
   }
-
-  const onError = () => {
-    alert('Google Login Failed')
-  }
-
   return (
     <div className="page">
       <div className="card">
         <h1>Welcome</h1>
         <p className="p-muted">Sign in to continue</p>
-        <GoogleLogin onSuccess={onSuccess} onError={onError} useOneTap />
+        <button onClick={onClick} disabled={loading}>Sign in with Google</button>
       </div>
     </div>
   )
 }
 
-function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <GoogleOAuthProvider clientId={clientId!}>
-      <AuthProvider>{children}</AuthProvider>
-    </GoogleOAuthProvider>
-  )
-}
+function Providers({ children }: { children: React.ReactNode }) { return <AuthProvider>{children}</AuthProvider> }
 
 function AppRoutes() {
   const { idToken } = useAuth()
@@ -67,6 +60,8 @@ function AppRoutes() {
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/schedule" element={<Schedule />} />
   <Route path="/analytics" element={<AnalyticsPage />} />
+  <Route path="/admin/usage" element={<AdminUsage />} />
+  <Route path="/admin/states" element={<AdminStates />} />
       </Route>
       {/* Existing editors */}
       <Route path="/builder" element={idToken ? <CanvasPOC /> : <Navigate to="/" replace />} />

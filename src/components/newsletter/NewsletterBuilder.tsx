@@ -39,7 +39,7 @@ type BlockType = 'heading' | 'paragraph' | 'image' | 'divider'
 interface Block { id: string; type: BlockType; html?: string; url?: string }
 
 interface ThemeState { fontFamily: string; accent: string; text: string; bg: string; headingSize: number; }
-const defaultTheme: ThemeState = { fontFamily: 'system-ui, sans-serif', accent: '#1db954', text: '#222', bg: '#ffffff', headingSize: 28 }
+const defaultTheme: ThemeState = { fontFamily: 'system-ui, sans-serif', accent: '#1db954', text: '#222222', bg: '#ffffff', headingSize: 28 }
 
 interface Page { id: string; name: string; blocks: Block[] }
 const PAGES_KEY = 'newsletter-pages-v1'

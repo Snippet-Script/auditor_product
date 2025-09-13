@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf'
 import { useNavigate } from 'react-router-dom'
 import styles from './CanvasPOC.module.css'
 import { rewriteWithAI } from '../../lib/ai'
+import { useAuth } from '../../auth/auth'
 
 interface ElementBase { id: string; x: number; y: number; w: number; h: number; type: 'text' | 'rect' | 'image'; rotation?: number }
 interface TextElement extends ElementBase { type: 'text'; text: string; fontSize: number; color: string; fontWeight?: number; fontStyle?: 'normal' | 'italic'; underline?: boolean; fontFamily?: string; textAlign?: 'left' | 'center' | 'right' }
@@ -11,8 +12,9 @@ interface ImageElement extends ElementBase { type: 'image'; src: string; fit: 'c
 
 type AnyEl = TextElement | RectElement | ImageElement
 
+// Use 6-digit hex for color because <input type="color"> rejects 3-digit shorthand in value binding.
 const createText = (): TextElement => ({
-  id: crypto.randomUUID(), type: 'text', x: 100, y: 100, w: 280, h: 90, text: 'Double click to edit', fontSize: 32, color: '#222', fontWeight: 600, fontStyle: 'normal', underline: false, fontFamily: 'system-ui, sans-serif', textAlign: 'left'
+  id: crypto.randomUUID(), type: 'text', x: 100, y: 100, w: 280, h: 90, text: 'Double click to edit', fontSize: 32, color: '#222222', fontWeight: 600, fontStyle: 'normal', underline: false, fontFamily: 'system-ui, sans-serif', textAlign: 'left'
 })
 const createRect = (): RectElement => ({ id: crypto.randomUUID(), type: 'rect', x: 80, y: 80, w: 300, h: 180, fill: '#2684ff', radius: 8 })
 const createImage = (src: string): ImageElement => ({ id: crypto.randomUUID(), type: 'image', x: 120, y: 140, w: 360, h: 240, src, fit: 'cover' })
@@ -22,6 +24,7 @@ const PAGES_KEY = 'canvas-poc-pages'
 const ASSETS_KEY = 'canvas-poc-assets'
 
 export default function CanvasPOC() {
+  const { idToken } = useAuth()
   const navigate = useNavigate()
   const [pages, setPages] = useState<Page[]>(() => {
     try { const raw = localStorage.getItem(PAGES_KEY); if (raw) return JSON.parse(raw) as Page[] } catch {}
@@ -47,6 +50,17 @@ export default function CanvasPOC() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiTone, setAiTone] = useState<string>('Concise')
   const [aiOutput, setAiOutput] = useState('')
+  const [aiUsage, setAiUsage] = useState<{ inputTokens:number; outputTokens:number; inputCost:number; outputCost:number; totalCost:number }|null>(null)
+  const [cumulativeUsage, setCumulativeUsage] = useState<{ totalInputTokens:number; totalOutputTokens:number; totalCost:number }|null>(null)
+  // Local (non-persisted) session aggregate when Firestore disabled
+  const [sessionUsage, setSessionUsage] = useState<{ totalInputTokens:number; totalOutputTokens:number; totalCost:number }>({ totalInputTokens:0, totalOutputTokens:0, totalCost:0 })
+  const LOCAL_USAGE_KEY = 'local-usage-aggregate'
+  const [saveStatus, setSaveStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle')
+  // Remote persistence availability (disabled when server not configured)
+  const [remoteEnabled, setRemoteEnabled] = useState<boolean | null>(null)
+  const saveTimer = useRef<number | null>(null)
+  const lastSyncedRef = useRef<string>('')
+  const saveDisabledUntil = useRef<number>(0)
   const [aiPos, setAiPos] = useState<{x:number;y:number}>({ x: 0, y: 0 })
   const [editingId, setEditingId] = useState<string | null>(null)
   const editorRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -56,6 +70,144 @@ export default function CanvasPOC() {
 
   useEffect(() => { localStorage.setItem(PAGES_KEY, JSON.stringify(pages)) }, [pages])
   useEffect(() => { localStorage.setItem(ASSETS_KEY, JSON.stringify(assets)) }, [assets])
+
+  // Load & refresh cumulative usage for floating overlay
+  const { idToken: usageToken } = useAuth();
+  const loadCumulative = useCallback(() => {
+    if (!usageToken) return;
+    fetch('/api/usage/me', { headers: { Authorization: `Bearer ${usageToken}` } })
+      .then(r => r.ok ? r.json() : r.text().then(t=>{throw new Error(t)}))
+      .then(d => { if (d.usage) setCumulativeUsage({
+        totalInputTokens: d.usage.totalInputTokens||0,
+        totalOutputTokens: d.usage.totalOutputTokens||0,
+        totalCost: d.usage.totalCost||0,
+      }) })
+      .catch(()=>{})
+  }, [usageToken])
+  useEffect(()=>{ loadCumulative() }, [loadCumulative])
+  useEffect(()=>{ const h=()=>loadCumulative(); window.addEventListener('usage-updated', h); return ()=> window.removeEventListener('usage-updated', h) }, [loadCumulative])
+
+  // Debounced remote save when authenticated
+  const scheduleSave = useCallback(() => {
+    if (!idToken) return; // only save when authenticated
+    if (remoteEnabled !== true) return; // skip until confirmed enabled
+    if (Date.now() < saveDisabledUntil.current) return; // backoff window
+    if (saveTimer.current) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(async () => {
+      try {
+        const payload = { pages, assets }
+        const serialized = JSON.stringify(payload)
+        if (serialized === lastSyncedRef.current) return; // no changes
+        setSaveStatus('saving')
+        const res = await fetch('/api/user/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ state: payload })
+        })
+        if (!res.ok) {
+          const txt = await res.text();
+          // If DB not configured, back off for 30s to avoid spam
+          if (txt.includes('DB not configured')) {
+            saveDisabledUntil.current = Date.now() + 30000;
+            setRemoteEnabled(false);
+          }
+          throw new Error(txt)
+        }
+        lastSyncedRef.current = serialized
+        setSaveStatus('saved')
+        setTimeout(() => { if (saveStatus === 'saved') setSaveStatus('idle') }, 1500)
+      } catch (e) {
+        console.error('Save failed', e)
+        setSaveStatus('error')
+      }
+    }, 600)
+  }, [idToken, pages, assets, saveStatus, remoteEnabled])
+
+  useEffect(() => { scheduleSave(); }, [pages, assets, scheduleSave])
+
+  // Initial remote load
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!idToken) return;
+      if (remoteEnabled === false) return; // skip if we already know remote is disabled
+      try {
+        const res = await fetch('/api/user/state', { headers: { Authorization: `Bearer ${idToken}` } })
+        if (!res.ok) {
+          const txt = await res.text();
+            if (txt.includes('DB not configured')) setRemoteEnabled(false);
+          throw new Error(txt)
+        }
+        const data = await res.json()
+        if (!data.state) return
+        const st = data.state
+        if (st.pages && Array.isArray(st.pages)) {
+          if (!cancelled) setPages(st.pages)
+        }
+        if (st.assets && Array.isArray(st.assets)) {
+          if (!cancelled) setAssets(st.assets)
+        }
+        try { lastSyncedRef.current = JSON.stringify({ pages: st.pages || [], assets: st.assets || [] }) } catch {}
+      } catch (e) {
+        console.warn('Remote load failed', e)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [idToken, remoteEnabled])
+
+  // Health preflight: detect if admin (Firestore) is configured. Sets remoteEnabled false if not.
+  useEffect(() => {
+    let done = false;
+    fetch('/api/health')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        if (d.adminReady === false) setRemoteEnabled(false); else setRemoteEnabled(true)
+      })
+      .catch(()=>{ if(!done) setRemoteEnabled(false) })
+    return () => { done = true }
+  }, [])
+
+  // Load any prior local aggregate usage (e.g., page reload while Firestore disabled)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_USAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') setSessionUsage({
+          totalInputTokens: parsed.totalInputTokens||0,
+          totalOutputTokens: parsed.totalOutputTokens||0,
+          totalCost: parsed.totalCost||0
+        });
+      }
+    } catch {}
+  }, [])
+
+  // Migration: normalize any legacy 3-digit color codes (#222) to #222222 (runs once per mount)
+  const migratedRef = useRef(false)
+  useEffect(() => {
+    if (migratedRef.current) return;
+    let changed = false;
+    setPages(ps => ps.map(p => ({...p, elements: p.elements.map(el => {
+      if ((el as any).color === '#222') { changed = true; return { ...el, color:'#222222' } }
+      return el
+    })})) )
+    if (changed) migratedRef.current = true;
+  }, [])
+
+  // Helper to update local session aggregate when remote persistence unavailable
+  const bumpSessionUsage = useCallback((u:{inputTokens:number;outputTokens:number;totalCost:number}) => {
+    setSessionUsage(prev => {
+      const next = {
+        totalInputTokens: prev.totalInputTokens + (u.inputTokens||0),
+        totalOutputTokens: prev.totalOutputTokens + (u.outputTokens||0),
+        totalCost: +(prev.totalCost + (u.totalCost||0)).toFixed(6)
+      };
+      try { localStorage.setItem(LOCAL_USAGE_KEY, JSON.stringify(next)) } catch {}
+      return next;
+    })
+  }, [])
 
   const updateCurrent = (mutate: (elements: AnyEl[]) => AnyEl[]) => {
     setPages(ps => ps.map(p => p.id === currentPage ? { ...p, elements: mutate(p.elements) } : p))
@@ -523,9 +675,10 @@ export default function CanvasPOC() {
                     <option>Professional</option>
                     <option>Expand</option>
                   </select>
-                  <button className={styles.aiRewriteBtn} disabled={aiLoading} onClick={async ()=>{ if (!sel || sel.type!=='text') return; setAiLoading(true); setAiError(null); setAiOutput(''); try { const out = await rewriteWithAI((sel as TextElement).text, aiTone); setAiOutput(out); } catch (err:any) { setAiError(err.message||'Failed'); } finally { setAiLoading(false); } }}>{aiLoading ? 'Rewriting…' : 'Rewrite'}</button>
+                    <button className={styles.aiRewriteBtn} disabled={aiLoading} onClick={async ()=>{ if (!sel || sel.type!=='text') return; setAiLoading(true); setAiError(null); setAiOutput(''); setAiUsage(null); try { const resp = await rewriteWithAI((sel as TextElement).text, aiTone, idToken); setAiOutput(resp.text); if (resp.usage) { setAiUsage(resp.usage); if (remoteEnabled === false) { bumpSessionUsage({ inputTokens: resp.usage.inputTokens, outputTokens: resp.usage.outputTokens, totalCost: resp.usage.totalCost }); } else { window.dispatchEvent(new Event('usage-updated')); } } } catch (err:any) { setAiError(err.message||'Failed'); } finally { setAiLoading(false); } }}>{aiLoading ? 'Rewriting…' : 'Rewrite'}</button>
                 </div>
                 {aiError && <div className={styles.aiError}>{aiError}</div>}
+                {/* Removed inline per-call usage block; now showing cumulative overlay top-right */}
                 <div className={styles.aiOutput}>{aiOutput || '—'}</div>
                 <div className={styles.aiActions}>
                   <button className={`${styles.aiBtn} ${styles.aiBtnPrimary}`} disabled={!aiOutput} onClick={()=>{ if (!sel || sel.type!=='text' || !aiOutput) return; onTextEdit(sel.id, aiOutput); setAiOpen(false) }}>Replace</button>
@@ -540,6 +693,25 @@ export default function CanvasPOC() {
               <button onClick={zoomIn}>+</button>
               <button onClick={resetZoom}>reset</button>
             </div>
+            {idToken && (
+              <div style={{ position:'absolute', top:6, right:8, fontSize:11, background:'#111c', padding:'4px 8px', borderRadius:12, color:'#ccc', backdropFilter:'blur(4px)', display:'flex', gap:6, alignItems:'center' }}>
+                <span>{remoteEnabled === false ? 'Local only' : saveStatus==='saving' && 'Saving…' || saveStatus==='saved' && 'Saved' || saveStatus==='error' && 'Save error' || 'Synced'}</span>
+                {remoteEnabled === false && <span style={{ width:6, height:6, background:'#ff9800', borderRadius:'50%' }} />}
+                {remoteEnabled !== false && saveStatus==='saving' && <span style={{ width:6, height:6, background:'#1db954', borderRadius:'50%', animation:'pulse 1s infinite' }} />}
+                {remoteEnabled !== false && saveStatus==='error' && <span style={{ width:6, height:6, background:'#ff5555', borderRadius:'50%' }} />}
+                {remoteEnabled !== false && saveStatus!=='saving' && saveStatus!=='error' && <span style={{ width:6, height:6, background:'#4caf50', borderRadius:'50%' }} />}
+                {(remoteEnabled !== false && cumulativeUsage) && (
+                  <span style={{ marginLeft:4, fontWeight:500 }}>
+                    tokens in {cumulativeUsage.totalInputTokens} · out {cumulativeUsage.totalOutputTokens} · ${'{'}cumulativeUsage.totalCost.toFixed(4){'}'}
+                  </span>
+                )}
+                {(remoteEnabled === false && (sessionUsage.totalInputTokens>0 || sessionUsage.totalOutputTokens>0)) && (
+                  <span style={{ marginLeft:4, fontWeight:500 }}>
+                    tokens (local) in {sessionUsage.totalInputTokens} · out {sessionUsage.totalOutputTokens} · ${'{'}sessionUsage.totalCost.toFixed(4){'}'}
+                  </span>
+                )}
+              </div>
+            )}
             <div ref={artboardRef} className={styles.artboard} style={{ transform:`scale(${scale})` }} onPointerDown={() => selectEl(null)} onWheel={(e) => { if (e.ctrlKey) onArtboardWheel(e) }}>
               {guideX !== null && <div className={`${styles.guide} ${styles.v}`} style={{ left:guideX }} />}
               {guideY !== null && <div className={`${styles.guide} ${styles.h}`} style={{ top:guideY }} />}

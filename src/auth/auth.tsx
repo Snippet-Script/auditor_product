@@ -1,19 +1,55 @@
-import React, { createContext, useContext, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
+import { auth, provider } from '../firebase'
+import { signInWithPopup, onAuthStateChanged, User, signOut, getIdToken } from 'firebase/auth'
 
 type AuthContextValue = {
+  user: User | null
   idToken: string | null
-  login: (token: string) => void
-  logout: () => void
+  signInWithGoogle: () => Promise<void>
+  refreshToken: () => Promise<string | null>
+  logout: () => Promise<void>
+  loading: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
   const [idToken, setIdToken] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u)
+      if (u) {
+        const token = await getIdToken(u, true)
+        setIdToken(token)
+      } else {
+        setIdToken(null)
+      }
+      setLoading(false)
+    })
+    return () => unsub()
+  }, [])
+
+  const signInWithGoogle = useCallback(async () => {
+    await signInWithPopup(auth, provider)
+  }, [])
+
+  const refreshToken = useCallback(async () => {
+    if (!user) return null
+    const token = await getIdToken(user, true)
+    setIdToken(token)
+    return token
+  }, [user])
+
+  const logout = useCallback(async () => {
+    await signOut(auth)
+  }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ idToken, login: setIdToken, logout: () => setIdToken(null) }),
-    [idToken]
+    () => ({ user, idToken, signInWithGoogle, refreshToken, logout, loading }),
+    [user, idToken, signInWithGoogle, refreshToken, logout, loading]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
