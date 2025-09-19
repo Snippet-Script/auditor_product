@@ -52,5 +52,5 @@ export default function AdminStates() {
   );
 }
 
-const th: React.CSSProperties = { borderBottom: '1px solid #ccc', textAlign: 'left', padding: '4px 8px', background: '#f8f8f8' };
+const th: React.CSSProperties = { borderBottom: '1px solid #ccc', textAlign: 'left', padding: '4px 8px', background: '#000000ff' };
 const td: React.CSSProperties = { borderBottom: '1px solid #eee', padding: '4px 8px', fontSize: 14 };

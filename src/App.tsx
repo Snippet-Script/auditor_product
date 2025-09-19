@@ -14,6 +14,7 @@ import Schedule from './routes/Schedule'
 import AnalyticsPage from './routes/AnalyticsPage'
 import AdminUsage from './routes/AdminUsage'
 import AdminStates from './routes/AdminStates'
+import AdminLogs from './routes/AdminLogs'
 import { NewsletterBuilder } from './components/newsletter'
 import { CanvasPOC } from './components/canvas'
 import { RewriteBox } from './components/ai/RewriteBox'
@@ -62,6 +63,7 @@ function AppRoutes() {
   <Route path="/analytics" element={<AnalyticsPage />} />
   <Route path="/admin/usage" element={<AdminUsage />} />
   <Route path="/admin/states" element={<AdminStates />} />
+  <Route path="/admin/logs" element={<AdminLogs />} />
       </Route>
       {/* Existing editors */}
       <Route path="/builder" element={idToken ? <CanvasPOC /> : <Navigate to="/" replace />} />

@@ -1,10 +1,12 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useAuth } from '../auth/auth'
 import { useNavigate } from 'react-router-dom'
 
 export default function Home() {
-  const { idToken, logout } = useAuth()
+  const { idToken, logout, user } = useAuth()
   const navigate = useNavigate()
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS as string | undefined)?.split(',').map(s=>s.trim()).filter(Boolean) || []
+  const isAdmin = useMemo(()=> !!(user?.email && adminEmails.includes(user.email)), [user?.email, adminEmails])
 
   const handleLogout = () => {
     logout()
@@ -23,8 +25,12 @@ export default function Home() {
           </details>
         )}
         <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:24 }}>
-          <button onClick={() => navigate('/builder')}>Create Newsletter</button>
-          <button onClick={() => navigate('/template')}>Open Wireframe Flow</button>
+          <button onClick={() => navigate('/builder')}>Canvas Builder</button>
+          <button onClick={() => navigate('/builder-advanced')}>Newsletter Builder</button>
+          <button onClick={() => navigate('/template')}>Wireframe Flow</button>
+          {isAdmin && <button onClick={() => navigate('/admin/usage')}>Admin Usage</button>}
+          {isAdmin && <button onClick={() => navigate('/admin/states')}>Admin States</button>}
+          {isAdmin && <button onClick={() => navigate('/admin/logs')}>Admin Logs</button>}
           <button onClick={handleLogout}>Sign out</button>
         </div>
       </div>
