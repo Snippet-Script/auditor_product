@@ -30,3 +30,6 @@ tsconfig.tsbuildinfo
 .env
 serviceAccount.json
 serviceAccount.*.json
+
+# On request: ignore the root README
+/README.md

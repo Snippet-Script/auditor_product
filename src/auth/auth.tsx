@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { auth, provider } from '../firebase'
-import { signInWithPopup, onAuthStateChanged, User, signOut, getIdToken } from 'firebase/auth'
+import { signInWithPopup, onAuthStateChanged, User, signOut, getIdToken, signInWithRedirect, getRedirectResult } from 'firebase/auth'
 
 type AuthContextValue = {
   user: User | null
@@ -33,7 +33,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
-    await signInWithPopup(auth, provider)
+    try {
+      await signInWithPopup(auth, provider)
+    } catch (e: any) {
+      // Some browsers or COOP/COEP headers can block popup close; fallback to redirect
+      if (e && e.code && String(e.code).includes('popup')) {
+        await signInWithRedirect(auth, provider)
+      } else {
+        throw e
+      }
+    }
+  }, [])
+
+  // Handle redirect results on load (in case popup fallback occurred)
+  useEffect(() => {
+    getRedirectResult(auth).catch(() => {/* ignore */})
   }, [])
 
   const refreshToken = useCallback(async () => {

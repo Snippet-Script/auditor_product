@@ -481,8 +481,8 @@ export default function CanvasPOC() {
     setEditingId(null)
   }
   const onArtboardWheel = (e: React.WheelEvent) => {
-    // Zoom the A4 artboard under the cursor; prevent page scroll
-    e.preventDefault()
+    // Zoom the A4 artboard under the cursor; prevent page scroll if allowed
+    if (e.cancelable) e.preventDefault()
     if (e.deltaY > 0) zoomOut(); else zoomIn()
   }
   const sel = getEl(selectedId)

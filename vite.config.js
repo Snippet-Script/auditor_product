@@ -8,6 +8,10 @@ export default defineConfig({
     host: '0.0.0.0',
     // Keep local dev flexible; allowedHosts only affects external access
   allowedHosts: ['auditor-product-1.onrender.com'],
+    // Allow Firebase Auth popups to interact with opener in dev
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -20,5 +24,8 @@ export default defineConfig({
     port: Number(process.env.PORT) || 4173,
     strictPort: true,
   allowedHosts: ['auditor-product.onrender.com', 'auditor-product-1.onrender.com'],
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+    }
   },
 })

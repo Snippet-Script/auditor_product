@@ -50,7 +50,7 @@ function userStateRef(uid) { return adminDb.collection('userStates').doc(uid); }
 
 // GET user state
 app.get('/api/user/state', authMiddleware, async (req, res) => {
-  if (!adminReady || !adminDb) return res.status(500).json({ error: 'DB not configured' });
+  if (!adminReady || !adminDb) return res.json({ state: null, persistence: false });
   try {
     const snap = await userStateRef(req.user.uid).get();
     if (!snap.exists) return res.json({ state: null });
@@ -63,7 +63,7 @@ app.get('/api/user/state', authMiddleware, async (req, res) => {
 
 // POST user state (replace / upsert)
 app.post('/api/user/state', authMiddleware, async (req, res) => {
-  if (!adminReady || !adminDb) return res.status(500).json({ error: 'DB not configured' });
+  if (!adminReady || !adminDb) return res.json({ ok: true, persistence: false });
   try {
     const { state } = req.body || {};
     if (state == null) return res.status(400).json({ error: 'Missing state' });
@@ -175,7 +175,7 @@ app.get('/api/usage/me', authMiddleware, async (req, res) => {
 
 // Admin: list all users usage
 app.get('/api/usage/all', authMiddleware, async (req, res) => {
-  if (!adminReady || !adminDb) return res.status(500).json({ error: 'DB not configured' });
+  if (!adminReady || !adminDb) return res.json({ rows: [], persistence: false });
   if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const snap = await adminDb.collection('usage').get();
@@ -189,7 +189,7 @@ app.get('/api/usage/all', authMiddleware, async (req, res) => {
 
 // Admin: list all user states (metadata + size)
 app.get('/api/admin/states', authMiddleware, async (req, res) => {
-  if (!adminReady || !adminDb) return res.status(500).json({ error: 'DB not configured' });
+  if (!adminReady || !adminDb) return res.json({ rows: [], persistence: false });
   if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const snap = await adminDb.collection('userStates').get();
@@ -215,7 +215,7 @@ app.get('/api/admin/states', authMiddleware, async (req, res) => {
 
 // Admin: list usage logs (recent first) with optional uid filter
 app.get('/api/usage/logs', authMiddleware, async (req, res) => {
-  if (!adminReady || !adminDb) return res.status(500).json({ error: 'DB not configured' });
+  if (!adminReady || !adminDb) return res.json({ rows: [], persistence: false });
   if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { uid, limit } = req.query;
