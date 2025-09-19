@@ -1,5 +1,6 @@
 import React from 'react';
 import { rewriteWithAI } from '../../lib/ai';
+import { useAuth } from '../../auth/auth';
 
 export function RewriteBox() {
   const [value, setValue] = React.useState('B.E. ELECTRONICS & COMMUNICATION ENGINEERING');
@@ -8,12 +9,13 @@ export function RewriteBox() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const { idToken } = useAuth();
   const onRewrite = async () => {
     setLoading(true);
     setError(null);
     try {
-      const text = await rewriteWithAI(value, tone);
-      setOut(text);
+      const resp = await rewriteWithAI(value, tone, idToken);
+      setOut(resp.text);
     } catch (e: any) {
       setError(e.message || 'Failed');
     } finally {
