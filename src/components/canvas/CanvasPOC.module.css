@@ -170,7 +170,7 @@
   justify-content: center;
   align-items: flex-start;
   overflow: auto;
-  padding: 48px 80px 64px;
+  padding: 92px 80px 64px; /* extra top to fit Source Panel */
   position: relative;
   background: repeating-conic-gradient(
     from 45deg,
@@ -184,6 +184,7 @@
 }
 .artboardShell {
   position: relative;
+  width: 794px; /* anchor shell to artboard width for centering */
 }
 .zoomBadge {
   position: absolute;
@@ -639,6 +640,140 @@
 .alignGroup {
   display: flex;
   gap: 4px;
+}
+
+/* Source Panel (top area) */
+.sourcePanel {
+  position: sticky;
+  top: 16px; /* stays in view while scrolling */
+  margin: 0 0 12px 0;
+  background: #11161a;
+  border: 1px solid #2d3236;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 8px 26px -10px #000c;
+  z-index: 20;
+}
+.sourcePanel.collapsed {
+  padding: 8px 10px;
+}
+.sourcePanel.floating {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 794px;
+}
+.sourceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #9aa2a9;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.sourceItem {
+  background: #14191d;
+  border: 1px solid #2d3236;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sourceTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slotCircle {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0f1418;
+  border: 1px solid #2b3238;
+  font-weight: 700;
+  font-size: 12px;
+}
+.tagInput, .titleInput, .imageInput, .slotInput {
+  background: #1b2126;
+  border: 1px solid #30363c;
+  color: #e0e6ea;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.bodyInput {
+  background: #1b2126;
+  border: 1px solid #30363c;
+  color: #e0e6ea;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  min-height: 60px;
+  resize: vertical;
+}
+.sourceActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sourceBtn, .populateBtn, .sourceRemove {
+  background: #232a30;
+  border: 1px solid #30383e;
+  color: #d5dae0;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.populateBtn {
+  background: #2684ff;
+  border-color: #2684ff;
+  color: #fff;
+}
+.sourceBtnActive {
+  background: #22364a;
+  border-color: var(--accent);
+}
+.populateBtn:hover {
+  background: #2f8bfd;
+  border-color: #2f8bfd;
+}
+
+/* Slot badge overlay on elements */
+.slotBadge {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #0f1418;
+  border: 1px solid #2b3238;
+  color: #dbe1e6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.slotBadge.match {
+  outline: 2px solid #2ecc71;
+}
+.slotBadge.missing {
+  outline: 2px solid #ff6b6b;
 }
 
 /* AI Rewrite panel */

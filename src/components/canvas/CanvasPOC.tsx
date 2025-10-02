@@ -5,7 +5,8 @@ import styles from './CanvasPOC.module.css'
 import { rewriteWithAI } from '../../lib/ai'
 import { useAuth } from '../../auth/auth'
 
-interface ElementBase { id: string; x: number; y: number; w: number; h: number; type: 'text' | 'rect' | 'image'; rotation?: number }
+type MapField = 'title' | 'subtitle' | 'body' | 'image'
+interface ElementBase { id: string; x: number; y: number; w: number; h: number; type: 'text' | 'rect' | 'image'; rotation?: number; slot?: number; mapField?: MapField }
 interface TextElement extends ElementBase { type: 'text'; text: string; fontSize: number; color: string; fontWeight?: number; fontStyle?: 'normal' | 'italic'; underline?: boolean; fontFamily?: string; textAlign?: 'left' | 'center' | 'right' }
 interface RectElement extends ElementBase { type: 'rect'; fill: string; radius: number }
 interface ImageElement extends ElementBase { type: 'image'; src: string; fit: 'cover' | 'contain' }
@@ -22,6 +23,18 @@ const createImage = (src: string): ImageElement => ({ id: crypto.randomUUID(), t
 interface Page { id: string; name: string; elements: AnyEl[] }
 const PAGES_KEY = 'canvas-poc-pages'
 const ASSETS_KEY = 'canvas-poc-assets'
+const SOURCES_KEY = 'canvas-poc-sources'
+
+// Content source item (top panel)
+interface SourceItem {
+  id: string;
+  slot: number;     // maps to element.slot
+  tag?: string;     // e.g., India, World
+  title: string;    // main text to populate
+  subtitle?: string;
+  body?: string;
+  image?: string;   // optional image URL for image elements
+}
 
 export default function CanvasPOC() {
   const { idToken } = useAuth()
@@ -33,6 +46,20 @@ export default function CanvasPOC() {
   const [currentPage, setCurrentPage] = useState<string>(() => pages[0].id)
   const els = pages.find(p => p.id === currentPage)?.elements || []
   const [assets, setAssets] = useState<string[]>(() => { try { const raw = localStorage.getItem(ASSETS_KEY); if (raw) return JSON.parse(raw) } catch {}; return [] })
+  const [sources, setSources] = useState<SourceItem[]>(() => {
+    try { const raw = localStorage.getItem(SOURCES_KEY); if (raw) return JSON.parse(raw) as SourceItem[] } catch {}
+    // starter examples (can be edited)
+    return [
+      { id: crypto.randomUUID(), slot: 1, tag: 'India', title: '', subtitle: '', body: '', image: '' },
+      { id: crypto.randomUUID(), slot: 2, tag: 'World', title: '', subtitle: '', body: '', image: '' },
+    ]
+  })
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null)
+  const [previewOn, setPreviewOn] = useState(false)
+  const [panelCollapsed, setPanelCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('source-panel-collapsed') === '1' } catch { return false } })
+  const [panelFloating, setPanelFloating] = useState<boolean>(() => { try { return localStorage.getItem('source-panel-floating') === '1' } catch { return false } })
+  useEffect(()=>{ try { localStorage.setItem('source-panel-collapsed', panelCollapsed ? '1':'0') } catch {} }, [panelCollapsed])
+  useEffect(()=>{ try { localStorage.setItem('source-panel-floating', panelFloating ? '1':'0') } catch {} }, [panelFloating])
   const [selectedId, setSelected] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const dragOffset = useRef<{ ox: number; oy: number; ex: number; ey: number } | null>(null)
@@ -70,6 +97,7 @@ export default function CanvasPOC() {
 
   useEffect(() => { localStorage.setItem(PAGES_KEY, JSON.stringify(pages)) }, [pages])
   useEffect(() => { localStorage.setItem(ASSETS_KEY, JSON.stringify(assets)) }, [assets])
+  useEffect(() => { try { localStorage.setItem(SOURCES_KEY, JSON.stringify(sources)) } catch {} }, [sources])
 
   // Load & refresh cumulative usage for floating overlay
   const { idToken: usageToken } = useAuth();
@@ -95,7 +123,7 @@ export default function CanvasPOC() {
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(async () => {
       try {
-        const payload = { pages, assets }
+        const payload = { pages, assets, sources }
         const serialized = JSON.stringify(payload)
         if (serialized === lastSyncedRef.current) return; // no changes
         setSaveStatus('saving')
@@ -121,7 +149,7 @@ export default function CanvasPOC() {
         setSaveStatus('error')
       }
     }, 600)
-  }, [idToken, pages, assets, saveStatus, remoteEnabled])
+  }, [idToken, pages, assets, sources, saveStatus, remoteEnabled])
 
   useEffect(() => { scheduleSave(); }, [pages, assets, scheduleSave])
 
@@ -147,7 +175,10 @@ export default function CanvasPOC() {
         if (st.assets && Array.isArray(st.assets)) {
           if (!cancelled) setAssets(st.assets)
         }
-        try { lastSyncedRef.current = JSON.stringify({ pages: st.pages || [], assets: st.assets || [] }) } catch {}
+        if (Array.isArray(st.sources)) {
+          if (!cancelled) setSources(st.sources as SourceItem[])
+        }
+        try { lastSyncedRef.current = JSON.stringify({ pages: st.pages || [], assets: st.assets || [], sources: st.sources || [] }) } catch {}
       } catch (e) {
         console.warn('Remote load failed', e)
       }
@@ -217,6 +248,77 @@ export default function CanvasPOC() {
   const addRect = () => { const r = createRect(); updateCurrent(e => [...e, r]); selectEl(r.id) }
   const addImgUrl = () => { const url = prompt('Enter image URL'); if (!url) return; const img = createImage(url); updateCurrent(e => [...e, img]); selectEl(img.id) }
   const addImgAsset = (src: string) => { const img = createImage(src); updateCurrent(e => [...e, img]); selectEl(img.id) }
+  // Source panel helpers
+  const addSource = () => {
+    const nextSlot = (sources.reduce((m, s) => Math.max(m, s.slot), 0) || 0) + 1
+    setSources(list => [...list, { id: crypto.randomUUID(), slot: nextSlot, tag: '', title: '' }])
+  }
+  const removeSource = (id: string) => setSources(list => list.filter(s => s.id !== id))
+  const updateSource = (id: string, patch: Partial<SourceItem>) => setSources(list => list.map(s => s.id === id ? { ...s, ...patch } : s))
+  const onSourceDragStart = (id: string, e: React.DragEvent) => {
+    setDragSourceId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  const onSourceDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
+  const onSourceDrop = (targetId: string) => {
+    if (!dragSourceId || dragSourceId === targetId) return;
+    setSources(list => {
+      const from = list.findIndex(s => s.id === dragSourceId);
+      const to = list.findIndex(s => s.id === targetId);
+      if (from < 0 || to < 0) return list;
+      const copy = [...list];
+      const [item] = copy.splice(from, 1);
+      copy.splice(to, 0, item);
+      return copy;
+    })
+    setDragSourceId(null);
+  }
+  const renumberSlots = () => {
+    setSources(list => list.map((s, i) => ({ ...s, slot: i + 1 })))
+  }
+  const shiftSlots = (delta: number) => {
+    setSources(list => list.map(s => ({ ...s, slot: Math.max(1, (s.slot || 1) + delta) })))
+  }
+  const ensureSourcesUpTo = (maxSlot: number) => {
+    setSources(list => {
+      let out = [...list];
+      for (let n = 1; n <= maxSlot; n++) {
+        if (!out.some(s => s.slot === n)) {
+          out.push({ id: crypto.randomUUID(), slot: n, tag: '', title: '', subtitle: '', body: '', image: '' })
+        }
+      }
+      // Keep deterministic order by slot
+      out.sort((a,b)=>a.slot-b.slot);
+      return out;
+    })
+  }
+  const populateFromSources = () => {
+    const map = new Map<number, SourceItem>();
+    for (const s of sources) if (s.slot) map.set(Number(s.slot), s)
+    updateCurrent(list => list.map(el => {
+      if (!el.slot) return el
+      const src = map.get(el.slot)
+      if (!src) return el
+      const field: MapField = el.mapField || (el.type === 'image' ? 'image' : 'title')
+      if (el.type === 'text') {
+        const val = field === 'title' ? src.title : field === 'subtitle' ? (src.subtitle || '') : field === 'body' ? (src.body || '') : ''
+        return { ...(el as TextElement), text: val }
+      } else if (el.type === 'image') {
+        const url = src.image || ''
+        if (url) return { ...(el as ImageElement), src: url }
+      }
+      return el
+    }))
+  }
+
+  const assignmentForElement = (el: AnyEl) => {
+    if (!el.slot) return { has: false, field: el.type==='image'?'image':'title', src: undefined as SourceItem|undefined }
+    const src = sources.find(s => s.slot === el.slot)
+    const field: MapField = el.mapField || (el.type === 'image' ? 'image' : 'title')
+    const val = src ? (field === 'title' ? src.title : field === 'subtitle' ? src.subtitle : field === 'body' ? src.body : src.image) : undefined
+    const has = Boolean(val && typeof val === 'string' && val.trim().length)
+    return { has, field, src }
+  }
   const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader(); reader.onload = ev => { if (typeof ev.target?.result === 'string') setAssets(a => [...a, ev.target!.result as string]) }; reader.readAsDataURL(file)
@@ -503,34 +605,37 @@ export default function CanvasPOC() {
     setSelected(null)
   }
   const applyNewsletterTemplate = () => {
-    const hero = createRect(); hero.x = 60; hero.y = 140; hero.w = 674; hero.h = 260; hero.fill = '#ececec'
-    const title = createText(); title.text = 'Newsletter Title'; title.x = 60; title.y = 40; title.fontSize = 54; title.w = 650
-    const subtitle = createText(); subtitle.text = 'Subtitle or tagline goes here'; subtitle.x = 60; subtitle.y = 105; subtitle.fontSize = 22; subtitle.w = 650; subtitle.fontWeight = 400
-    const body = createText(); body.text = '• Point one\n• Point two\n• Point three'; body.x = 60; body.y = 430; body.w = 660; body.fontSize = 18; body.fontWeight = 400
+    const hero = createRect(); hero.x = 60; hero.y = 140; hero.w = 674; hero.h = 260; hero.fill = '#ececec'; hero.slot = 3
+    const title = createText(); title.text = 'Newsletter Title'; title.x = 60; title.y = 40; title.fontSize = 54; title.w = 650; title.slot = 1; (title as any).mapField = 'title'
+    const subtitle = createText(); subtitle.text = 'Subtitle or tagline goes here'; subtitle.x = 60; subtitle.y = 105; subtitle.fontSize = 22; subtitle.w = 650; subtitle.fontWeight = 400; (subtitle as any).slot = 2; (subtitle as any).mapField='subtitle'
+    const body = createText(); body.text = '• Point one\n• Point two\n• Point three'; body.x = 60; body.y = 430; body.w = 660; body.fontSize = 18; body.fontWeight = 400; (body as any).slot = 4; (body as any).mapField='body'
     const footer = createText(); footer.text = 'Footer • Contact • Unsubscribe'; footer.x = 60; footer.y = 1040; footer.fontSize = 14; footer.w = 660; footer.fontWeight = 400
     setPages(ps => ps.map(p => p.id === currentPage ? { ...p, elements: [title, subtitle, hero, body, footer] } : p)); setSelected(title.id)
+    ensureSourcesUpTo(4)
   }
   const applyTemplateColumns = () => {
-    const title = createText(); title.text='Weekly Update'; title.x=60; title.y=40; title.fontSize=50; title.w=660
-    const intro = createText(); intro.text='Short intro paragraph welcoming readers.'; intro.x=60; intro.y=110; intro.fontSize=20; intro.w=660; intro.fontWeight=400
+    const title = createText(); title.text='Weekly Update'; title.x=60; title.y=40; title.fontSize=50; title.w=660; (title as any).slot=1; (title as any).mapField='title'
+    const intro = createText(); intro.text='Short intro paragraph welcoming readers.'; intro.x=60; intro.y=110; intro.fontSize=20; intro.w=660; intro.fontWeight=400; (intro as any).slot=2; (intro as any).mapField='subtitle'
     const colBg = createRect(); colBg.x=60; colBg.y=190; colBg.w=674; colBg.h=520; colBg.fill='#f5f7fa'; colBg.radius=12
-    const col1 = createText(); col1.text='Column 1\n- Item A\n- Item B'; col1.x=80; col1.y=210; col1.w=180; col1.h=200; col1.fontSize=18; col1.fontWeight=400
-    const col2 = createText(); col2.text='Column 2\nHighlight a feature'; col2.x=300; col2.y=210; col2.w=180; col2.h=200; col2.fontSize=18; col2.fontWeight=400
-    const col3 = createText(); col3.text='Column 3\nKey metrics'; col3.x=520; col3.y=210; col3.w=180; col3.h=200; col3.fontSize=18; col3.fontWeight=400
+    const col1 = createText(); col1.text='Column 1\n- Item A\n- Item B'; col1.x=80; col1.y=210; col1.w=180; col1.h=200; col1.fontSize=18; col1.fontWeight=400; (col1 as any).slot=3; (col1 as any).mapField='body'
+    const col2 = createText(); col2.text='Column 2\nHighlight a feature'; col2.x=300; col2.y=210; col2.w=180; col2.h=200; col2.fontSize=18; col2.fontWeight=400; (col2 as any).slot=4; (col2 as any).mapField='body'
+    const col3 = createText(); col3.text='Column 3\nKey metrics'; col3.x=520; col3.y=210; col3.w=180; col3.h=200; col3.fontSize=18; col3.fontWeight=400; (col3 as any).slot=5; (col3 as any).mapField='body'
     const ctaRect = createRect(); ctaRect.x=60; ctaRect.y=760; ctaRect.w=674; ctaRect.h=130; ctaRect.fill='#2684ff'; ctaRect.radius=10
-    const ctaTxt = createText(); ctaTxt.text='Call To Action'; ctaTxt.x=290; ctaTxt.y=795; ctaTxt.w=220; ctaTxt.fontSize=34; ctaTxt.color='#ffffff'; ctaTxt.fontWeight=600
+    const ctaTxt = createText(); ctaTxt.text='Call To Action'; ctaTxt.x=290; ctaTxt.y=795; ctaTxt.w=220; ctaTxt.fontSize=34; ctaTxt.color='#ffffff'; ctaTxt.fontWeight=600; (ctaTxt as any).slot=6; (ctaTxt as any).mapField='title'
     setPages(ps=> ps.map(p=> p.id===currentPage ? { ...p, elements:[title,intro,colBg,col1,col2,col3,ctaRect,ctaTxt] }:p)); setSelected(title.id)
+    ensureSourcesUpTo(6)
   }
   const applyTemplatePromo = () => {
-    const hero = createImage('https://via.placeholder.com/1200x600.png?text=Hero'); hero.x=60; hero.y=40; hero.w=674; hero.h=340
+    const hero = createImage('https://via.placeholder.com/1200x600.png?text=Hero'); hero.x=60; hero.y=40; hero.w=674; hero.h=340; (hero as any).slot=1; (hero as any).mapField='image'
     const overlay = createRect(); overlay.x=60; overlay.y=40; overlay.w=674; overlay.h=340; overlay.fill='#00000055'; overlay.radius=0
-    const heading = createText(); heading.text='Big Seasonal Promotion'; heading.x=100; heading.y=120; heading.w=600; heading.fontSize=46; heading.color='#ffffff'
-    const sub = createText(); sub.text='Save up to 50% on selected items'; sub.x=100; sub.y=190; sub.w=560; sub.fontSize=24; sub.fontWeight=400; sub.color='#ffffff'
-    const body = createText(); body.text='Offer valid until DATE. Terms and conditions apply.'; body.x=60; body.y=420; body.w=660; body.fontSize=18; body.fontWeight=400
+    const heading = createText(); heading.text='Big Seasonal Promotion'; heading.x=100; heading.y=120; heading.w=600; heading.fontSize=46; heading.color='#ffffff'; (heading as any).slot=2; (heading as any).mapField='title'
+    const sub = createText(); sub.text='Save up to 50% on selected items'; sub.x=100; sub.y=190; sub.w=560; sub.fontSize=24; sub.fontWeight=400; sub.color='#ffffff'; (sub as any).slot=3; (sub as any).mapField='subtitle'
+    const body = createText(); body.text='Offer valid until DATE. Terms and conditions apply.'; body.x=60; body.y=420; body.w=660; body.fontSize=18; body.fontWeight=400; (body as any).slot=4; (body as any).mapField='body'
     const button = createRect(); button.x=60; button.y=500; button.w=220; button.h=70; button.fill='#2684ff'; button.radius=12
-    const btnTxt = createText(); btnTxt.text='Shop Now'; btnTxt.x=95; btnTxt.y=520; btnTxt.w=170; btnTxt.fontSize=30; btnTxt.color='#fff'
+    const btnTxt = createText(); btnTxt.text='Shop Now'; btnTxt.x=95; btnTxt.y=520; btnTxt.w=170; btnTxt.fontSize=30; btnTxt.color='#fff'; (btnTxt as any).slot=5; (btnTxt as any).mapField='title'
     const footer = createText(); footer.text='Company • Address • Unsubscribe'; footer.x=60; footer.y=1040; footer.fontSize=14; footer.w=660; footer.fontWeight=400
     setPages(ps=> ps.map(p => p.id===currentPage ? { ...p, elements:[hero,overlay,heading,sub,body,button,btnTxt,footer] }:p)); setSelected(heading.id)
+    ensureSourcesUpTo(5)
   }
   const removeSel = () => deleteSelected()
 
@@ -687,6 +792,42 @@ export default function CanvasPOC() {
                 </div>
               </div>
             )}
+            {/* Source Panel (top) */}
+            <div className={`${styles.sourcePanel} ${panelCollapsed?styles.collapsed:''} ${panelFloating?styles.floating:''}`}>
+              <div className={styles.sourceHeader}>
+                <strong>Sources</strong>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className={styles.sourceBtn} onClick={()=> setPanelCollapsed(v=>!v)}>{panelCollapsed? 'Expand':'Collapse'}</button>
+                  <button className={styles.sourceBtn} onClick={()=> setPanelFloating(v=>!v)}>{panelFloating? 'Unpin':'Pin / Float'}</button>
+                  <button className={styles.sourceBtn} onClick={addSource}>+ Add</button>
+                  <button className={styles.sourceBtn} onClick={renumberSlots}>Renumber 1..N</button>
+                  <button className={styles.sourceBtn} onClick={()=> shiftSlots(-1)}>Shift -1</button>
+                  <button className={styles.sourceBtn} onClick={()=> shiftSlots(1)}>Shift +1</button>
+                  <button className={`${styles.sourceBtn} ${previewOn?styles.sourceBtnActive:''}`} onClick={()=> setPreviewOn(v=>!v)}>{previewOn?'Hide Preview':'Preview'}</button>
+                  <button className={styles.populateBtn} onClick={populateFromSources}>Populate</button>
+                </div>
+              </div>
+              {!panelCollapsed && (
+              <div className={styles.sourceGrid}>
+                {sources.map(s => (
+                  <div key={s.id} className={styles.sourceItem} draggable onDragStart={(e)=> onSourceDragStart(s.id, e)} onDragOver={onSourceDragOver} onDrop={()=> onSourceDrop(s.id)}>
+                    <div className={styles.sourceTopRow}>
+                      <span className={styles.slotCircle} title="Slot #">{s.slot || '?'}</span>
+                      <input className={styles.tagInput} placeholder="Tag" value={s.tag||''} onChange={e=> updateSource(s.id, { tag: e.target.value })} />
+                    </div>
+                    <input className={styles.titleInput} placeholder="Headline / text" value={s.title} onChange={e=> updateSource(s.id, { title: e.target.value })} />
+                    <input className={styles.titleInput} placeholder="Subtitle (optional)" value={s.subtitle||''} onChange={e=> updateSource(s.id, { subtitle: e.target.value })} />
+                    <textarea className={styles.bodyInput} placeholder="Body (optional)" value={s.body||''} onChange={e=> updateSource(s.id, { body: e.target.value })} />
+                    <input className={styles.imageInput} placeholder="Image URL (optional)" value={s.image||''} onChange={e=> updateSource(s.id, { image: e.target.value })} />
+                    <div className={styles.sourceActions}>
+                      <input type="number" min={1} className={styles.slotInput} value={s.slot} onChange={e=> updateSource(s.id, { slot: parseInt(e.target.value,10)||1 })} />
+                      <button className={styles.sourceRemove} onClick={()=> removeSource(s.id)}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              )}
+            </div>
             <div className={styles.zoomBadge}>
               <button onClick={zoomOut}>-</button>
               <span>{Math.round(scale*100)}%</span>
@@ -727,6 +868,11 @@ export default function CanvasPOC() {
                       onPointerDown={e => onPointerDown(e, el.id)}
                       onDoubleClick={() => { const ref = editorRefs.current.get(t.id); if (ref) { ref.focus(); setEditingId(t.id) } }}
                     >
+                      {typeof el.slot === 'number' && (
+                        (()=>{ const info = assignmentForElement(el); return (
+                          <span className={`${styles.slotBadge} ${previewOn ? (info.has? styles.match : styles.missing) : ''}`} title={info.src? (info.src.tag? `${info.src.tag}`: 'Source'): 'No source'}>{el.slot}</span>
+                        )})()
+                      )}
                       <div
                         className={styles.inlineEdit}
                         contentEditable
@@ -745,6 +891,11 @@ export default function CanvasPOC() {
                   const r = el as RectElement
                   return (
                     <div key={el.id} className={`${styles.el} ${el.id === selectedId ? styles.selected : ''}`} style={{ left:r.x, top:r.y, width:r.w, height:r.h, background:r.fill, borderRadius:r.radius }} onPointerDown={e => onPointerDown(e, el.id)}>
+                      {typeof el.slot === 'number' && (
+                        (()=>{ const info = assignmentForElement(el); return (
+                          <span className={`${styles.slotBadge} ${previewOn ? (info.has? styles.match : styles.missing) : ''}`} title={info.src? (info.src.tag? `${info.src.tag}`: 'Source'): 'No source'}>{el.slot}</span>
+                        )})()
+                      )}
                       {el.id === selectedId && <div className={`${styles.resizeHandle} ${styles['rh-br']}`} onPointerDown={e => onResizeDown(e, el.id, 'br')} />}
                     </div>
                   )
@@ -753,6 +904,11 @@ export default function CanvasPOC() {
                   const im = el as ImageElement
                   return (
                     <div key={el.id} className={`${styles.el} ${styles.imageEl} ${el.id === selectedId ? styles.selected : ''}`} style={{ left:im.x, top:im.y, width:im.w, height:im.h }} onPointerDown={e => onPointerDown(e, el.id)}>
+                      {typeof el.slot === 'number' && (
+                        (()=>{ const info = assignmentForElement(el); return (
+                          <span className={`${styles.slotBadge} ${previewOn ? (info.has? styles.match : styles.missing) : ''}`} title={info.src? (info.src.tag? `${info.src.tag}`: 'Source'): 'No source'}>{el.slot}</span>
+                        )})()
+                      )}
                       <img src={im.src} style={{ objectFit: im.fit }} />
                       {el.id === selectedId && <div className={`${styles.resizeHandle} ${styles['rh-br']}`} onPointerDown={e => onResizeDown(e, el.id, 'br')} />}
                     </div>
@@ -785,6 +941,18 @@ export default function CanvasPOC() {
           {!sel && <div style={{ fontSize:12, opacity:.6 }}>Select an element</div>}
           {sel && sel.type === 'text' && (() => { const t = sel as TextElement; return (
             <div>
+              <div className={styles.propRow}>
+                <label>Slot #</label>
+                <input type="number" min={1} value={sel.slot || ''} onChange={e => updateSel({ slot: e.target.value ? parseInt(e.target.value,10) : undefined })} />
+              </div>
+              <div className={styles.propRow}>
+                <label>Map Field</label>
+                <select value={sel.mapField || 'title'} onChange={e=> updateSel({ mapField: (e.target.value as MapField) })}>
+                  <option value="title">Title</option>
+                  <option value="subtitle">Subtitle</option>
+                  <option value="body">Body</option>
+                </select>
+              </div>
               <div className={styles.propRow}>
                 <label>Font Size</label>
                 <input type="range" min={10} max={120} value={t.fontSize} onChange={e => updateSel({ fontSize: parseInt(e.target.value,10) })} />
@@ -824,6 +992,10 @@ export default function CanvasPOC() {
           {sel && sel.type === 'rect' && (
             <div>
               <div className={styles.propRow}>
+                <label>Slot #</label>
+                <input type="number" min={1} value={sel.slot || ''} onChange={e => updateSel({ slot: e.target.value ? parseInt(e.target.value,10) : undefined })} />
+              </div>
+              <div className={styles.propRow}>
                 <label>Fill</label>
                 <input type="color" value={(sel as RectElement).fill} onChange={e => updateSel({ fill: e.target.value })} />
               </div>
@@ -835,6 +1007,16 @@ export default function CanvasPOC() {
           )}
           {sel && sel.type === 'image' && (
             <div>
+              <div className={styles.propRow}>
+                <label>Slot #</label>
+                <input type="number" min={1} value={sel.slot || ''} onChange={e => updateSel({ slot: e.target.value ? parseInt(e.target.value,10) : undefined })} />
+              </div>
+              <div className={styles.propRow}>
+                <label>Map Field</label>
+                <select value={sel.mapField || 'image'} onChange={e=> updateSel({ mapField: (e.target.value as MapField) })}>
+                  <option value="image">Image URL</option>
+                </select>
+              </div>
               <div className={styles.propRow}>
                 <label>Image URL</label>
                 <input value={(sel as ImageElement).src} onChange={e => updateSel({ src: e.target.value })} />
